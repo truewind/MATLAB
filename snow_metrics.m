@@ -184,12 +184,12 @@ else
                 
                 %%% date of first snow event (sdate_01_1st_snow)
                 sdate_01_1st_snow_ind = find(cSWE(:,k) > 0, 1, 'first');
-                snow_periods.sdate_01_1st_snow(j,k) = cTIME(sdate_01_1st_snow_ind,7);
+                snow_periods.sdate_01_1st_snow(j,k) = cTIME(sdate_01_1st_snow_ind);
                 
                 
                 %%% peak SWE timing (sdate_03_peak_swe).  defined as the FINAL date of maximum SWE in the season
                 sdate_03_peak_swe_ind = find(cSWE(:,k) == snow_accum.peakSWE(j,k), 1,'last');
-                snow_periods.sdate_03_peak_swe(j,k) = cTIME(sdate_03_peak_swe_ind,7);
+                snow_periods.sdate_03_peak_swe(j,k) = cTIME(sdate_03_peak_swe_ind);
                 
                 
                 %%% date of start of longest continuous snow (sdate_02_1st_snow_cont)
@@ -201,7 +201,7 @@ else
                     sdate_02_1st_snow_cont_ind = 1;
                 end
                 
-                snow_periods.sdate_02_1st_snow_cont(j,k) = cTIME(sdate_02_1st_snow_cont_ind,7);
+                snow_periods.sdate_02_1st_snow_cont(j,k) = cTIME(sdate_02_1st_snow_cont_ind);
                 
                 
                 %%% normalized SWE (for computing dates of 50%, 75%, 90% melt out, etc)
@@ -213,7 +213,7 @@ else
                 if isempty(sdate_07_melt100_ind)==1
                     snow_periods.sdate_07_melt100(j,k)=NaN;
                 else
-                    snow_periods.sdate_07_melt100(j,k) = cTIME(sdate_07_melt100_ind,7);
+                    snow_periods.sdate_07_melt100(j,k) = cTIME(sdate_07_melt100_ind);
                 end
                 
                 
@@ -227,15 +227,15 @@ else
                     sdate_05_melt75_ind = find(nSWE(1:sdate_07_melt100_ind)>=0.25, 1, 'last');
                     sdate_06_melt90_ind = find(nSWE(1:sdate_07_melt100_ind)>=0.10, 1, 'last');
                     
-                    snow_periods.sdate_04_melt50(j,k) = cTIME(sdate_04_melt50_ind,7);
-                    snow_periods.sdate_05_melt75(j,k) = cTIME(sdate_05_melt75_ind,7);
-                    snow_periods.sdate_06_melt90(j,k) = cTIME(sdate_06_melt90_ind,7);
+                    snow_periods.sdate_04_melt50(j,k) = cTIME(sdate_04_melt50_ind);
+                    snow_periods.sdate_05_melt75(j,k) = cTIME(sdate_05_melt75_ind);
+                    snow_periods.sdate_06_melt90(j,k) = cTIME(sdate_06_melt90_ind);
                 end
                 
                 
                 %%% final snow day (sdate_08_final_snow)
                 sdate_08_final_snow_ind = find(cSWE(:,k)>0, 1, 'last');
-                snow_periods.sdate_08_final_snow(j,k) = cTIME(sdate_08_final_snow_ind,7)+(dt/24);
+                snow_periods.sdate_08_final_snow(j,k) = cTIME(sdate_08_final_snow_ind)+(dt/24);
                 
                 
                 %%% length of accumulation (days_09_accumulation), melt (days_10_snowmelt), 
@@ -255,7 +255,7 @@ else
                 melt0cumulative = cumsum(melt0(:,k));
                 melt0cumulative = melt0cumulative./nanmax(melt0cumulative);
                 sdate_13_meltCOM_annual_ind = find(melt0cumulative>=0.5,1,'first');
-                snow_periods.sdate_13_meltCOM_annual(j,k) = cTIME(sdate_13_meltCOM_annual_ind,7);
+                snow_periods.sdate_13_meltCOM_annual(j,k) = cTIME(sdate_13_meltCOM_annual_ind);
                 
                 
                 %%% Accumulation Season metrics
