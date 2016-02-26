@@ -13,6 +13,7 @@
 %       Ta = air temperature, K or C (will assume C if mean is less than 40 C)
 %       eo = vapor pressure (kPa) - optional if RH is provided and option Method_vpr>0
 %       RH = fractional relative humidity
+%       Qsi = incoming shortwave radiation (W m^-2)
 %
 %   M_PARAMS = structure with the coefficients used for the method.  If you
 %   want to use the defaults, set M_PARAMS.P1_clr = []; or simply exclude the 
@@ -44,6 +45,17 @@
 %           12 = Swinbank (1963)
 %           13 = Dilley and O'Brien (1998)
 %
+%           %%% additional methods from Juszak and Pellicciotti (2013)
+%           14 = Maykut and Church (1973)
+%           15 = Konzelmann et al. (1994)
+%           16 = Dilley and O'Brien (A) (1998)
+%
+%           %%% other methods
+%           17 = Campbell and Norman (1998) as cited by Walter et al (2005)
+%           18 = Long and Turner (2008) - based on Brutsaert (1975)
+%           19 = Ohmura (1982) as cited by Howard and Stull 2013
+%           20 = Efimova (1961) as cited by Key et al (1996)
+% 
 % OUTPUTS
 %   e_clr = clear-sky emissivity of the atmosphere
 %
@@ -53,9 +65,15 @@
 
 function e_clr = inc_LW_e_clr(M_INPUTS, M_PARAMS, M_OPTIONS)
 
+%% constants
+
+stefan = 5.67 * (10^-8);        % Stefan-Boltzmann constant (J/s/m^2/K^4)
+T_C2K = 273.15;                 % conversion from C to K
+% E_L2W = 41840/86400;            % conversion from langleys/day to W/m2
+
 %% Checks
 
-if M_OPTIONS.Method_clr-floor(M_OPTIONS.Method_clr)~=0 || M_OPTIONS.Method_clr < 1 || M_OPTIONS.Method_clr>13
+if M_OPTIONS.Method_clr-floor(M_OPTIONS.Method_clr)~=0 || M_OPTIONS.Method_clr < 1 || M_OPTIONS.Method_clr>20
     error('Invalid M_OPTIONS.Method_clr')
 end
 
@@ -66,7 +84,7 @@ end
 % Now check to see if Ta is in Celsius, and if so, convert to K
 if nanmean(nanmean(M_INPUTS.Ta)) < 40
     % then assume the input was in Celsius
-    M_INPUTS.Ta = M_INPUTS.Ta + 273.15;
+    M_INPUTS.Ta = M_INPUTS.Ta + T_C2K;
 end
 
 % Now check to make sure RH is in fractional
@@ -80,8 +98,8 @@ end
 
 %% Common variables
 
-stefan = 5.67 * (10^-8);        % Stefan-Boltzmann constant (J/s/m^2/K^4)
 Ta = M_INPUTS.Ta;
+RH = M_INPUTS.RH;
 
 if M_OPTIONS.Method_vpr==0
     if isfield(M_INPUTS, 'eo') ~=1
@@ -89,20 +107,23 @@ if M_OPTIONS.Method_vpr==0
     end
     
     eo = M_INPUTS.eo;
+%     esat = M_INPUTS.esat;
 elseif M_OPTIONS.Method_vpr==1
     error('this has not been coded yet')
 elseif M_OPTIONS.Method_vpr==2
     % Clausius-Clapeyron e_sat in mb (hPa) from Murray 1967
-    sat_vap_pressure = 6.1078.*exp((17.2693882.*(Ta-273.16))./(Ta-35.86));
+    sat_vap_pressure = 6.1078.*exp((17.2693882.*(Ta-T_C2K))./(Ta-35.86));
     eo = M_INPUTS.RH .* sat_vap_pressure;
     
     % Convert eo from hPa to kPa
     eo = eo./10;
+%     esat = sat_vap_pressure./10;
 end
 
 
 
-%%%%%%% at this point, eo should be in kPa and Ta should be in K
+%%%%%%% at this point, eo should be in kPa and Ta should be in K, RH should
+%%%%%%% be fractional
 
 % Prata (1996) approximation for precipitable water
 w = 465 .* (eo./Ta);            % note: corrected to be 465 instead of 4650 (error in Flerchinger Table 1)
@@ -163,7 +184,46 @@ elseif M_OPTIONS.Method_clr==13
     % 13 = Dilley and O'Brien (1998)
     nparams = 3;
     P(1) = 59.38; P(2) = 113.7; P(3) = 96.96;
+elseif M_OPTIONS.Method_clr==14
+    % 14 = Maykut and Church (1973)
+    nparams = 1;
+    P(1) = 0.7855;
+elseif M_OPTIONS.Method_clr==15
+    % 15 = Konzelmann et al. (1994)
+    nparams = 3;
+    P(1) = 0.23; P(2) = 0.484; P(3) = 1.8;
+elseif M_OPTIONS.Method_clr==16
+    % 16 = Dilley and O'Brien (A) (1998)
+    nparams = 3;
+    P(1) = 2.232; P(2) = -1.875; P(3) = 0.7356;
+elseif M_OPTIONS.Method_clr==17
+    % 17 = Campbell and Norman (1998) as cited by Walter et al (2005)
+    nparams = 2;
+    P(1) = 0.72 - 0.005*T_C2K;      % modified so Ta is in (K) instead of (C) ....should be -0.6458 after the maths...
+    P(2) = 0.005;
+elseif M_OPTIONS.Method_clr==18
+    % 18 = Long and Turner (2008) - based on Brutsaert (1975)
+    nparams = 5;
+    %%% simplify the k-value determination - use one value for day, one for
+    %%% night (where night/day is based on threshold in Qsi data)
+    P(1) = 1.18;            % daytime k value, varies diurnally (and likely spatially) - see Fig 2 
+    P(2) = 1.28;            % nighttime k value
+    P(3) = (1.39e-11 + 3.36e-12 + 1.47e-11 + 4.07e-12)/4;          % "a" coefficient - average of four datasets
+    P(4) = (4.8769+5.1938+4.8768+5.1421)/4;                        % "b" coefficient - average of four datasets
+    P(5) = (1/7);           % brutsaert exponent
+elseif M_OPTIONS.Method_clr==19
+    % 19 = Ohmura (1982) as cited by Howard and Stull 2013
+    nparams = 2;
+    P(1) = 8.733 * 10^-3; P(2) = 0.788;
+elseif M_OPTIONS.Method_clr==20
+    % 20 = Efimova (1961) as cited by Key et al (1996)
+    nparams = 2;
+    P(1) = 0.746;
+    P(2) = 0.0066*10;  % need to multiply by 10 to account for e in mb isntead of kPa
 end
+
+         
+
 
 %%% check for existence of parameters and set default values if no params were specified
 params_spec = zeros(1,nparams); % initialize variable to get size of each param
@@ -226,7 +286,7 @@ elseif M_OPTIONS.Method_clr==4
     e_clr = M_PARAMS.P1_clr - M_PARAMS.P2_clr .*exp(-1.* M_PARAMS.P3_clr .*eo);
 elseif M_OPTIONS.Method_clr==5
     % 5 = Idso and Jackson (1969) (Idso-1)
-    e_clr = 1 - M_PARAMS.P1_clr .*exp(-1.* M_PARAMS.P2_clr .*(Ta-273.16).^2);
+    e_clr = 1 - M_PARAMS.P1_clr .*exp(-1.* M_PARAMS.P2_clr .*(Ta-T_C2K).^2);
 elseif M_OPTIONS.Method_clr==6
     % 6 = Idso (1981) (Idso-2)
     e_clr = M_PARAMS.P1_clr + (M_PARAMS.P2_clr .* eo .* exp(M_PARAMS.P3_clr./Ta));
@@ -256,11 +316,38 @@ elseif M_OPTIONS.Method_clr==12
     e_clr = Lclr./(stefan.*(Ta.^4));    % effective emissivity
 elseif M_OPTIONS.Method_clr==13
     % 13 = Dilley and O'Brien (1998)
-    Lclr = M_PARAMS.P1_clr + M_PARAMS.P2_clr .*((Ta/273.16).^6) + M_PARAMS.P3_clr .*sqrt(w./2.5); % note: corrected to be 2.5 instead of 25 (error in Flerchinger Table 1)
+    Lclr = M_PARAMS.P1_clr + M_PARAMS.P2_clr .*((Ta/T_C2K).^6) + M_PARAMS.P3_clr .*sqrt(w./2.5); % note: corrected to be 2.5 instead of 25 (error in Flerchinger Table 1)
     e_clr = Lclr./(stefan.*(Ta.^4));    % effective emissivity
+elseif M_OPTIONS.Method_clr==14
+    % 14 = Maykut and Church (1973)
+    e_clr = M_PARAMS.P1_clr;
+elseif M_OPTIONS.Method_clr==15
+    % 15 = Konzelmann et al. (1994)
+    e_clr = M_PARAMS.P1_clr + M_PARAMS.P2_clr .* (1000*eo./Ta).^(M_PARAMS.P3_clr);
+elseif M_OPTIONS.Method_clr==16
+    % 16 = Dilley and O'Brien (A) (1998)
+    e_clr = 1 - exp(-1.66.*(M_PARAMS.P1_clr + M_PARAMS.P2_clr .*(Ta/T_C2K) + M_PARAMS.P3_clr .*sqrt(w./2.5)));
+elseif M_OPTIONS.Method_clr==17
+    % 17 = Campbell and Norman (1998) as cited by Walter et al (2005)
+    e_clr = M_PARAMS.P1_clr + M_PARAMS.P2_clr.*Ta;
+elseif M_OPTIONS.Method_clr==18
+    % 18 = Long and Turner (2008) - based on Brutsaert (1975)
+    k_array = Ta*0 + M_PARAMS.P1_clr;                % set all values to daytime k
+    if isfield(M_INPUTS, 'Qsi')==1
+        k_array(M_INPUTS.Qsi<50) = M_PARAMS.P2_clr;      % set night time values to night k
+    end
+    Ccoeff = k_array + M_PARAMS.P3_clr.*(RH.*100).^M_PARAMS.P4_clr;
+    e_clr = Ccoeff .* (eo.*10./Ta).^M_PARAMS.P5_clr;      % times 10 to convert from kPa to mb
+elseif M_OPTIONS.Method_clr==19
+    % 19 = Ohmura (1982) as cited by Howard and Stull 2013
+    e_clr = M_PARAMS.P1_clr .* Ta.^(M_PARAMS.P2_clr);
+elseif M_OPTIONS.Method_clr==20
+    % 20 = Efimova (1961) as cited by Key et al (1996)
+    e_clr = M_PARAMS.P1_clr + M_PARAMS.P2_clr .*eo;
 end
 
 %%% apply limits and recalculate Lclr
 e_clr(e_clr<0) = 0;
 e_clr(e_clr>1) = 1;
+
 
